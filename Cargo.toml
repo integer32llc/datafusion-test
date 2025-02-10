@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-datafusion = "45.0.0"
+datafusion = { path = "../arrow-datafusion/datafusion/core" }
+env_logger = "0.11.6"
+log = "0.4.25"
 object_store = "0.11.2"
 tokio = { version = "1.43.0", features = ["rt-multi-thread"] }

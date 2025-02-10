@@ -7,11 +7,14 @@ use datafusion::{
     execution::object_store::ObjectStoreUrl,
     prelude::*,
 };
+use log::*;
 use object_store::ObjectStore;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::init();
+
     let data_dir = "/Users/carolnichols/Downloads/smaller-repro/";
     let store = Arc::new(object_store::memory::InMemory::new()) as Arc<dyn ObjectStore>;
 
@@ -44,7 +47,7 @@ async fn main() -> Result<()> {
     println!("Getting results...");
     let results = df.collect().await?;
 
-    println!("Got {} results", results.len());
+    debug!("Got {} record batches", results.len());
 
     Ok(())
 }
