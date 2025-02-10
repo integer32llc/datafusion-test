@@ -36,7 +36,9 @@ async fn main() -> Result<()> {
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(ParquetFormat::default().get_ext());
 
-    let ctx = SessionContext::new();
+    let config = SessionConfig::new()
+        .with_target_partitions(4);
+    let ctx = SessionContext::new_with_config(config);
     let object_store_url = ObjectStoreUrl::parse("test:///").unwrap();
     ctx.register_object_store(object_store_url.as_ref(), store);
     ctx.register_listing_table("test_table", data_dir, listing_options.clone(), None, None)
