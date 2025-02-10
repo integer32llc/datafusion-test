@@ -37,7 +37,8 @@ async fn main() -> Result<()> {
         .with_file_extension(ParquetFormat::default().get_ext());
 
     let config = SessionConfig::new()
-        .with_target_partitions(4);
+        .with_target_partitions(4)
+        .set_bool("datafusion.execution.parquet.pushdown_filters", true);
     let ctx = SessionContext::new_with_config(config);
     let object_store_url = ObjectStoreUrl::parse("test:///").unwrap();
     ctx.register_object_store(object_store_url.as_ref(), store);
