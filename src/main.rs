@@ -15,10 +15,10 @@ use std::sync::Arc;
 async fn main() -> Result<()> {
     env_logger::init();
 
-    let data_dir = "/Users/carolnichols/Downloads/smaller-repro/";
+    let data_dir = "./data";
     let store = Arc::new(object_store::memory::InMemory::new()) as Arc<dyn ObjectStore>;
 
-    for file in std::fs::read_dir(data_dir)? {
+    for file in std::fs::read_dir(&data_dir)? {
         let file = file?.path();
         let bytes = std::fs::read(&file)?;
 

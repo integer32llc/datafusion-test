@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-datafusion = { path = "../arrow-datafusion/datafusion/core" }
+datafusion = "45.0.0"
 env_logger = "0.11.6"
 log = "0.4.25"
 object_store = "0.11.2"
