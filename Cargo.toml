@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 datafusion = "45.0.0"
 env_logger = "0.11.6"
+executor = { path = "../influxdb_iox/executor" }
 futures-util = "0.3.31"
 log = "0.4.25"
 object_store = "0.11.2"

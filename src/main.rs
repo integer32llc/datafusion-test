@@ -8,6 +8,7 @@ use datafusion::{
     physical_plan::{coalesce_partitions::CoalescePartitionsExec, ExecutionPlan},
     prelude::*,
 };
+use executor::DedicatedExecutor;
 use futures_util::TryStreamExt;
 use log::*;
 use object_store::ObjectStore;
@@ -58,16 +59,21 @@ async fn main() -> Result<()> {
     debug!("Executing physical plan...");
     let partition = 0;
     let task_context = Arc::new(TaskContext::from(&ctx));
-    let stream =
-        tokio::task::spawn_blocking(move || physical_plan.execute(partition, task_context))
-            .await
-            .unwrap()
-            .unwrap();
+    let executor = DedicatedExecutor::new(
+        "datafusion",
+        tokio::runtime::Builder::new_multi_thread(),
+        Default::default(),
+    );
+
+    let stream = executor.spawn(async move {
+            physical_plan.execute(partition, task_context)
+        })
+        .await.unwrap().unwrap();
 
     debug!("Getting results...");
     let results: Vec<_> = stream.try_collect().await?;
 
     debug!("Got {} record batches", results.len());
-
+    executor.join().await;
     Ok(())
 }
