@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
             .await
             .unwrap();
     }
-    println!("Done loading data into in-memory object store");
+    debug!("Done loading data into in-memory object store");
 
     let query = "SELECT distinct \"A\", \"B\", \"C\", \"D\", \"E\" FROM \"test_table\"";
     let file_format = ParquetFormat::default().with_enable_pruning(true);
@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
 
     let df = ctx.sql(query).await?;
 
-    println!("Getting results...");
+    debug!("Getting results...");
     let results = df.collect().await?;
 
     debug!("Got {} record batches", results.len());
