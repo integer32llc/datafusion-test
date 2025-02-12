@@ -4,9 +4,11 @@ use datafusion::{
         file_format::{parquet::ParquetFormat, FileFormat},
         listing::ListingOptions,
     },
-    execution::object_store::ObjectStoreUrl,
+    execution::{context::TaskContext, object_store::ObjectStoreUrl},
+    physical_plan::{coalesce_partitions::CoalescePartitionsExec, ExecutionPlan},
     prelude::*,
 };
+use futures_util::TryStreamExt;
 use log::*;
 use object_store::ObjectStore;
 use std::sync::Arc;
@@ -45,10 +47,25 @@ async fn main() -> Result<()> {
     ctx.register_listing_table("test_table", data_dir, listing_options.clone(), None, None)
         .await?;
 
-    let df = ctx.sql(query).await?;
+    debug!("Creating logical plan...");
+    let logical_plan = ctx.state().create_logical_plan(query).await?;
+
+    debug!("Creating physical plan...");
+    let physical_plan = Arc::new(CoalescePartitionsExec::new(
+        ctx.state().create_physical_plan(&logical_plan).await?,
+    ));
+
+    debug!("Executing physical plan...");
+    let partition = 0;
+    let task_context = Arc::new(TaskContext::from(&ctx));
+    let stream =
+        tokio::task::spawn_blocking(move || physical_plan.execute(partition, task_context))
+            .await
+            .unwrap()
+            .unwrap();
 
     debug!("Getting results...");
-    let results = df.collect().await?;
+    let results: Vec<_> = stream.try_collect().await?;
 
     debug!("Got {} record batches", results.len());
 
