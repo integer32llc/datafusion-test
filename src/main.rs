@@ -13,10 +13,11 @@ use datafusion::{
 use futures_util::TryStreamExt;
 use log::*;
 use object_store::ObjectStore;
-use std::{sync::Arc, time::{Duration, Instant}};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio_util::sync::CancellationToken;
-
-const WAIT_BEFORE_CANCEL: Duration = Duration::from_millis(30);
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -38,7 +39,19 @@ async fn main() -> Result<()> {
     }
     debug!("Done loading data into in-memory object store");
 
-    let start = Instant::now();
+    for wait_time in 1..=50 {
+        let cancel_duration = run_test(wait_time, Arc::clone(&store), data_dir).await?;
+        println!("{wait_time}ms\t{}ms", cancel_duration.as_millis());
+    }
+
+    Ok(())
+}
+
+async fn run_test(
+    wait_time: u64,
+    store: Arc<dyn ObjectStore>,
+    data_dir: &'static str,
+) -> Result<Duration> {
     let token = CancellationToken::new();
     let captured_token = token.clone();
 
@@ -69,7 +82,9 @@ async fn main() -> Result<()> {
     });
 
     debug!("in main, non-blocking sleep");
-    tokio::time::sleep(WAIT_BEFORE_CANCEL).await;
+    tokio::time::sleep(Duration::from_millis(wait_time)).await;
+
+    let start = Instant::now();
 
     debug!("cancelling thread");
     token.cancel();
@@ -77,9 +92,10 @@ async fn main() -> Result<()> {
     if let Err(e) = join_handle.await {
         debug!("Error waiting for shutdown: {e}");
     }
-    debug!("done with main in {:?}; expected to be around {WAIT_BEFORE_CANCEL:?}", start.elapsed());
+    let elapsed = start.elapsed();
+    debug!("done cancelling thread in {elapsed:?}");
 
-    Ok(())
+    Ok(elapsed)
 }
 
 async fn blocks_too_much() {
@@ -94,7 +110,7 @@ async fn yields_enough() {
     debug!("done with nonblocking sleep");
 }
 
-async fn datafusion(store: Arc<dyn ObjectStore>, data_dir: &str) -> Result<()> {
+async fn datafusion(store: Arc<dyn ObjectStore>, data_dir: &'static str) -> Result<()> {
     let query = "SELECT distinct \"A\", \"B\", \"C\", \"D\", \"E\" FROM \"test_table\"";
     let file_format = ParquetFormat::default().with_enable_pruning(true);
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -120,8 +136,7 @@ async fn datafusion(store: Arc<dyn ObjectStore>, data_dir: &str) -> Result<()> {
     debug!("Executing physical plan...");
     let partition = 0;
     let task_context = Arc::new(TaskContext::from(&ctx));
-    let stream = physical_plan.execute(partition, task_context)
-        .unwrap();
+    let stream = physical_plan.execute(partition, task_context).unwrap();
 
     debug!("Getting results...");
     let results: Vec<_> = stream.try_collect().await?;
