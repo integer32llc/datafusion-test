@@ -16,7 +16,7 @@ use object_store::ObjectStore;
 use std::{sync::Arc, time::{Duration, Instant}};
 use tokio_util::sync::CancellationToken;
 
-const WAIT_BEFORE_CANCEL: Duration = Duration::from_millis(1_000);
+const WAIT_BEFORE_CANCEL: Duration = Duration::from_millis(30);
 
 #[tokio::main]
 async fn main() -> Result<()> {
