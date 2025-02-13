@@ -39,9 +39,11 @@ async fn main() -> Result<()> {
     }
     debug!("Done loading data into in-memory object store");
 
+    println!("| Wait time (ms) | Cancel duration (ms) |");
+    println!("|----------------|----------------------|");
     for wait_time in 1..=50 {
         let cancel_duration = run_test(wait_time, Arc::clone(&store), data_dir).await?;
-        println!("{wait_time}ms\t{}ms", cancel_duration.as_millis());
+        println!("| {wait_time} | {} |", cancel_duration.as_millis());
     }
 
     Ok(())
