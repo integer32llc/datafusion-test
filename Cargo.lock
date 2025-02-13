@@ -1163,6 +1163,7 @@ dependencies = [
  "log",
  "object_store",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
