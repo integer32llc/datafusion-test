@@ -4,10 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+arrow = "54.1.0"
 datafusion = "45.0.0"
 env_logger = "0.11.6"
+fastrand = "2.3.0"
 futures-util = "0.3.31"
 log = "0.4.25"
 object_store = "0.11.2"
+parquet = "54.1.0"
 tokio = { version = "1.43.0", features = ["rt-multi-thread"] }
 tokio-util = "0.7.13"

@@ -1157,11 +1157,14 @@ dependencies = [
 name = "datafusion-test"
 version = "0.1.0"
 dependencies = [
+ "arrow",
  "datafusion",
  "env_logger",
+ "fastrand",
  "futures-util",
  "log",
  "object_store",
+ "parquet",
  "tokio",
  "tokio-util",
 ]
