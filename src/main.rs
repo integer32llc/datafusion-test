@@ -20,6 +20,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use tokio::runtime::Runtime;
 use tokio_util::sync::CancellationToken;
 
 /// Adjust how many data files are generated
@@ -28,32 +29,31 @@ const NUM_FILES: usize = 7;
 const ROWS_PER_FILE: usize = 5_000_000;
 /// Adjust the maximum time to wait and let the datafusion code run, in milliseconds. 1 through
 /// this number of milliseconds will be tested.
-const MAX_WAIT_TIME: u64 = 50;
+const MAX_WAIT_TIME: u64 = 60;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     env_logger::init();
 
     let data_dir = "data";
-    let files_on_disk = find_or_generate_files(data_dir).await?;
+    let files_on_disk = find_or_generate_files(data_dir)?;
 
     let store = Arc::new(object_store::memory::InMemory::new()) as Arc<dyn ObjectStore>;
 
     debug!("Starting to load data into in-memory object store");
-    load_data(Arc::clone(&store), &files_on_disk).await?;
+    load_data(Arc::clone(&store), &files_on_disk)?;
     debug!("Done loading data into in-memory object store");
 
     println!("| Wait time (ms) | Cancel duration (ms) |");
     println!("|----------------|----------------------|");
-    for wait_time in 1..=MAX_WAIT_TIME {
-        let cancel_duration = run_test(wait_time, Arc::clone(&store), data_dir).await?;
+    for wait_time in 10..=MAX_WAIT_TIME {
+        let cancel_duration = run_test(wait_time, Arc::clone(&store), data_dir)?;
         println!("| {wait_time} | {} |", cancel_duration.as_millis());
     }
 
     Ok(())
 }
 
-async fn run_test(
+fn run_test(
     wait_time: u64,
     store: Arc<dyn ObjectStore>,
     data_dir: &'static str,
@@ -61,7 +61,8 @@ async fn run_test(
     let token = CancellationToken::new();
     let captured_token = token.clone();
 
-    let join_handle = tokio::spawn(async move {
+    let rt = Runtime::new()?;
+    rt.spawn(async move {
         debug!("Starting spawned");
         loop {
             let store = Arc::clone(&store);
@@ -87,19 +88,18 @@ async fn run_test(
         }
     });
 
-    debug!("in main, non-blocking sleep");
-    tokio::time::sleep(Duration::from_millis(wait_time)).await;
+    debug!("in main, sleeping");
+    std::thread::sleep(Duration::from_millis(wait_time));
 
     let start = Instant::now();
 
     debug!("cancelling thread");
     token.cancel();
 
-    if let Err(e) = join_handle.await {
-        debug!("Error waiting for shutdown: {e}");
-    }
+    drop(rt);
+
     let elapsed = start.elapsed();
-    debug!("done cancelling thread in {elapsed:?}");
+    debug!("done dropping runtime in {elapsed:?}");
 
     Ok(elapsed)
 }
@@ -163,12 +163,12 @@ async fn datafusion(store: Arc<dyn ObjectStore>, data_dir: &'static str) -> Resu
     Ok(())
 }
 
-async fn find_or_generate_files(data_dir: &'static str) -> Result<Vec<PathBuf>> {
+fn find_or_generate_files(data_dir: &'static str) -> Result<Vec<PathBuf>> {
     let files_on_disk = find_files_on_disk(data_dir)?;
 
     if files_on_disk.is_empty() {
         println!("No data files found, generating (this will take a bit)");
-        generate_data(data_dir).await?;
+        generate_data(data_dir)?;
         println!("Done generating files");
         let files_on_disk = find_files_on_disk(data_dir)?;
 
@@ -202,24 +202,27 @@ fn find_files_on_disk(data_dir: &'static str) -> Result<Vec<PathBuf>> {
         .collect())
 }
 
-async fn load_data(
+fn load_data(
     store: Arc<dyn ObjectStore>,
     files_on_disk: &[PathBuf],
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-    for file in files_on_disk {
-        let bytes = std::fs::read(&file)?;
+    let rt = Runtime::new()?;
+    rt.block_on(async {
+        for file in files_on_disk {
+            let bytes = std::fs::read(&file)?;
 
-        let path = object_store::path::Path::from(file.display().to_string());
-        let payload = object_store::PutPayload::from_bytes(bytes.into());
-        store
-            .put_opts(&path, payload, object_store::PutOptions::default())
-            .await?;
-    }
+            let path = object_store::path::Path::from(file.display().to_string());
+            let payload = object_store::PutPayload::from_bytes(bytes.into());
+            store
+                .put_opts(&path, payload, object_store::PutOptions::default())
+                .await?;
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
-async fn generate_data(
+fn generate_data(
     data_dir: &'static str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     let absolute = std::env::current_dir().unwrap().join(data_dir);
@@ -241,22 +244,25 @@ async fn generate_data(
         ("K", DataType::Utf8),
     ];
 
-    for file_num in 1..=NUM_FILES {
-        println!("Generating file {file_num} of {NUM_FILES}");
-        let data = columns.iter().map(|(column_name, column_type)| {
-            let column = random_data(column_type, ROWS_PER_FILE);
-            (column_name, column)
-        });
-        let to_write = RecordBatch::try_from_iter(data).unwrap();
-        let path = object_store::path::Path::from(format!("{file_num}.parquet").as_str());
-        let object_store_writer = ParquetObjectWriter::new(Arc::clone(&store) as _, path);
+    let rt = Runtime::new()?;
+    rt.block_on(async {
+        for file_num in 1..=NUM_FILES {
+            println!("Generating file {file_num} of {NUM_FILES}");
+            let data = columns.iter().map(|(column_name, column_type)| {
+                let column = random_data(column_type, ROWS_PER_FILE);
+                (column_name, column)
+            });
+            let to_write = RecordBatch::try_from_iter(data).unwrap();
+            let path = object_store::path::Path::from(format!("{file_num}.parquet").as_str());
+            let object_store_writer = ParquetObjectWriter::new(Arc::clone(&store) as _, path);
 
-        let mut writer = AsyncArrowWriter::try_new(object_store_writer, to_write.schema(), None)?;
-        writer.write(&to_write).await?;
-        writer.close().await?;
-    }
+            let mut writer = AsyncArrowWriter::try_new(object_store_writer, to_write.schema(), None)?;
+            writer.write(&to_write).await?;
+            writer.close().await?;
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 fn random_data(column_type: &DataType, rows: usize) -> Arc<dyn Array> {

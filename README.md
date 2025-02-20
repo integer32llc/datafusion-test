@@ -7,7 +7,7 @@ This binary will:
   files on disk, so if you leave the files around, subsequent runs of this tool won't take as long)
 - Load the on-disk files into an in-memory object store, which is necessary to reproduce the issue
   because reading from the in-memory object store does not `await`
-- Run a number of tests from 1ms to `MAX_WAIT_TIME` ms that:
+- Run a number of tests from 10ms to `MAX_WAIT_TIME` ms that:
   - Spawns a tokio task that `select!`s between running a datafusion query and waiting on a cancellation token
   - Waits the number of milliseconds configured for this test run
   - Cancels the token
@@ -63,7 +63,7 @@ running, differences in host system, etc. In general, with files generated using
 ```
 NUM_FILES = 7
 ROWS_PER_FILE = 5_000_000
-MAX_WAIT_TIME = 50
+MAX_WAIT_TIME = 60
 ```
 
 the results show there are some points in the datafusion processing that are not awaiting very
@@ -71,53 +71,54 @@ often so that they take significantly more than a millisecond to cancel:
 
 | Wait time (ms) | Cancel duration (ms) |
 |----------------|----------------------|
-| 1 | 27 |
-| 2 | 5 |
-| 3 | 4 |
-| 4 | 3 |
-| 5 | 2 |
-| 6 | 0 |
-| 7 | 7 |
-| 8 | 3 |
-| 9 | 0 |
-| 10 | 0 |
-| 11 | 0 |
-| 12 | 0 |
-| 13 | 0 |
-| 14 | 0 |
-| 15 | 0 |
-| 16 | 0 |
-| 17 | 0 |
-| 18 | 0 |
-| 19 | 0 |
-| 20 | 0 |
-| 21 | 0 |
-| 22 | 0 |
-| 23 | 0 |
-| 24 | 0 |
-| 25 | 0 |
-| 26 | 0 |
-| 27 | 0 |
-| 28 | 0 |
-| 29 | 0 |
-| 30 | 0 |
-| 31 | 0 |
-| 32 | 211 |
-| 33 | 0 |
-| 34 | 0 |
-| 35 | 19 |
-| 36 | 0 |
-| 37 | 0 |
-| 38 | 15 |
-| 39 | 0 |
-| 40 | 0 |
-| 41 | 0 |
-| 42 | 0 |
-| 43 | 0 |
-| 44 | 0 |
-| 45 | 0 |
-| 46 | 35 |
-| 47 | 0 |
-| 48 | 0 |
-| 49 | 0 |
-| 50 | 0 |
+| 10 | 17 |
+| 11 | 317 |
+| 12 | 311 |
+| 13 | 398 |
+| 14 | 708 |
+| 15 | 308 |
+| 16 | 307 |
+| 17 | 309 |
+| 18 | 352 |
+| 19 | 301 |
+| 20 | 1688 |
+| 21 | 300 |
+| 22 | 301 |
+| 23 | 300 |
+| 24 | 312 |
+| 25 | 297 |
+| 26 | 1140 |
+| 27 | 294 |
+| 28 | 293 |
+| 29 | 340 |
+| 30 | 293 |
+| 31 | 298 |
+| 32 | 290 |
+| 33 | 306 |
+| 34 | 289 |
+| 35 | 291 |
+| 36 | 322 |
+| 37 | 285 |
+| 38 | 360 |
+| 39 | 372 |
+| 40 | 283 |
+| 41 | 283 |
+| 42 | 280 |
+| 43 | 278 |
+| 44 | 2086 |
+| 45 | 376 |
+| 46 | 276 |
+| 47 | 275 |
+| 48 | 276 |
+| 49 | 275 |
+| 50 | 407 |
+| 51 | 271 |
+| 52 | 269 |
+| 53 | 392 |
+| 54 | 266 |
+| 55 | 266 |
+| 56 | 398 |
+| 57 | 266 |
+| 58 | 267 |
+| 59 | 328 |
+| 60 | 327 |
